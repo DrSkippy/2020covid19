@@ -2,4 +2,4 @@
 
 * US only for now
 * naive, short term projects of current trends
-* user covidtracking.com data (so only test-confirmed cases, few hours of lag while records are updated)
+* uses covidtracking.com data (so only test-confirmed cases, few hours of lag while records are updated)
