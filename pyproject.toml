@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "covid19"
+version = "0.1.0"
+description = ""
+authors = ["DrSkippy <scott@drskippy.net>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.23.0"
+pandas = "^1.0.2"
+jupyter = "^1.0.0"
+matplotlib = "^3.2.0"
+seaborn = "^0.10.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
