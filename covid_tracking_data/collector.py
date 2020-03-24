@@ -1,14 +1,18 @@
 import pandas as pd
+import numpy as np
 import requests
 import logging
 import time
-
+import datetime
+import csv
 
 logfile = "/Users/drskippy/logs/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
 url = "https://covidtracking.com/api/{}"
 logging.info("using url={}".format(url))
+
+data_file = "/Users/drskippy/data/{}_{}.csv"
 
 
 def get_state_description():
@@ -65,14 +69,35 @@ def get_joined_dataframe(df_daily, df_state):
     return df
 
 
+def save_data(df, s):
+    dts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H%M")
+    df.to_csv(data_file.format(dts, "state_daily_data"))
+    wrtr = csv.writer(open(data_file.format(dts, "state_rank"), "w"))
+    wrtr.writerow(s.tolist())
+    return (data_file.format(dts, "state_daily_data"), data_file.format(dts, "state_rank"))
+
+
+def get_dataset_df_from_file(fn=(None, None)):
+    df = pd.read_csv(fn[0])
+    df["lastUpdateEt"] = pd.to_datetime(df["lastUpdateEt"], format="%Y-%m-%d %H:%M:%S")
+    df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
+    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
+    del(df["Unnamed: 0"])
+    rdr = csv.reader(open(fn[1], "r"))
+    sl = [r for r in rdr][0]
+    return df, sl
+
+
 def get_dataset_df():
     df_description, state_ordered_list = get_ranked_state_description_df(get_state_description())
     df_daily = get_state_daily_df(get_state_daily())
     df = get_joined_dataframe(df_daily, df_description)
-    print(df.head())
+    #print(df.head())
     print(df.describe())
     return df, state_ordered_list
 
 
 if "__main__" == __name__:
-    get_dataset_df()
+    df, sl = get_dataset_df()
+    print(save_data(df, sl))
+
