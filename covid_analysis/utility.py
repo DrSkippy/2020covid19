@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.DEBUG, filename=logfile)
 def get_state_df(df, state, pos_key = "positive"):
     if state == "*":
         # all states int he list, aggregated
-        dfq = df.groupby('date', as_index=False)[["date", pos_key]].sum()
+        dfq = df.groupby('date', as_index=False)[["date", pos_key, "negative", "pending"]].sum()
         dfq["lastUpdateEt"] =  max(df["lastUpdateEt"])  # use most recent for everything
     else:
         # select data for the state

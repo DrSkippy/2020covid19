@@ -24,6 +24,8 @@ def get_dataset_df_from_file(fn="/Users/drskippy/Working/2020covid19/data/total-
     dday = datetime.timedelta(days=1)
     df["date"] = df.Year.apply(lambda x: epoch+x*dday)
     df["lastUpdateEt"] = datetime.datetime.utcnow()
+    df["negative"] = 0
+    df["pending"] = 0
     sl = df.state.unique()
     return df, sl
 
