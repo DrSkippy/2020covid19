@@ -13,16 +13,17 @@ url = "https://ourworldindata.org/"
 logging.info("using url={}".format(url))
 
 def get_dataset_df_from_file(fn="/Users/drskippy/Working/2020covid19/data/total-cases-covid-19.csv"):
-    df = pd.read_csv(fn)
-    # Entity,Code,Year,Total confirmed cases of COVID-19 (cases)
+    df = pd.read_csv(fn, quoting=csv.QUOTE_MINIMAL)
+    # Entity,Code,Date,Total confirmed cases of COVID-19 (cases)
     mapper = {
         "Code": "state",
         "Total confirmed cases of COVID-19 (cases)": "positive"
     }
     df = df.rename(columns=mapper)
-    epoch = datetime.datetime(2000,1,1,0,0,0)
-    dday = datetime.timedelta(days=1)
-    df["date"] = df.Year.apply(lambda x: epoch+x*dday)
+    # epoch = datetime.datetime(2000,1,1,0,0,0)
+    # dday = datetime.timedelta(days=1)
+    # df["date"] = df.Year.apply(lambda x: epoch+x*dday)
+    df["date"] = pd.to_datetime(df.Date.apply(lambda x: x.strip().lower()), format="%b %d, %Y")
     df["lastUpdateEt"] = datetime.datetime.utcnow()
     df["negative"] = 0
     df["pending"] = 0
