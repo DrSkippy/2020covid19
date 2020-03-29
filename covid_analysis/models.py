@@ -1,4 +1,7 @@
 import pandas as pd
+import numpy as np
+from scipy.integrate import odeint
+
 import logging
 
 from covid_analysis.utility import *
@@ -26,15 +29,6 @@ def get_state_doubling_df(df, state, zero_aligned=False, min_pos=10, pos_key="po
         df_res["log_positive"] = df_res["log_positive"] - initial_value
         df_res["days_since_{}".format(min_pos)] = range(len(df_res))
     return df_res, dt, last_update
-
-
-def model_1_actual_infections(df, state, asymptomatic=0.8):
-    df_res, last_update = get_state_df(df, state)
-    # testing all and only symptoms
-    df_res["_model_1_daily_new_positive"] = df_res.daily_new_positive * (1 + asymptomatic)
-    df_res["model_1_positive"] = df_res._model_1_daily_new_positive.cumsum()
-    df_res["model_1_positive"] += df_res.positive[0]
-    return df_res
 
 
 def _fix_spurious_zeros(x):
@@ -86,4 +80,41 @@ def estimate_current_cases(new_by_day, resolution_time=10, hospitalized=.15, icu
         res = (int(s), int(hospitalized * s), int(icu * s))
     except ValueError as e:
         res = (0,0,0)
+    return res
+
+
+def SIRModel(N=100, I0=1, R0=0, beta=0.3, gamma=0.1):
+    # e.g. 5696 (thousand) for population of CO
+    # print("R-nought={}".format(beta/gamma))
+    # Total population, N.
+    # Initial number of infected and recovered individuals, I0 and R0.
+    # Everyone else, S0, is susceptible to infection initially.
+    S0 = N - I0 - R0
+    # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
+    # A grid of time points (in days)
+    t = np.linspace(0, 160, 160)
+    # The SIR model differential equations.
+    def deriv(y, t, N, beta, gamma):
+        S, I, R = y
+        dSdt = -beta * S * I / N
+        dIdt = beta * S * I / N - gamma * I
+        dRdt = gamma * I
+        return dSdt, dIdt, dRdt
+
+    # Initial conditions vector
+    y0 = S0, I0, R0
+    # Integrate the SIR equations over the time grid, t.
+    ret = odeint(deriv, y0, t, args=(N, beta, gamma))
+    S, I, R = ret.T
+
+    df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R})
+    return df
+
+
+def SIRSSE(x, N, R0, c):
+    beta, gamma, I0 = x
+    dfp = SIRModel(N, I0, R0, beta, gamma)
+    cp = dfp.infected.values + dfp.removed.values
+    cp = cp[:len(c)]
+    res = np.linalg.norm(c-cp)**2
     return res
