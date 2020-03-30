@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.integrate import odeint
+from scipy.optimize import minimize
 
 import logging
 
@@ -118,3 +119,22 @@ def SIRSSE(x, N, R0, c):
     cp = cp[:len(c)]
     res = np.linalg.norm(c-cp)**2
     return res
+
+
+def SIRFitter(c, N=350000,  x0=(0.3896, 0.08149, 0.1), R0=0):
+    a = minimize(SIRSSE, x0, args=(N, R0, c), method="Powell")
+    print(a)
+    beta, gamma, I0 = a.x
+
+    dfm = SIRModel(N=N, I0=I0, R0=R0, beta=beta, gamma=gamma)
+    dfm.plot(figsize=[15, 6])
+
+    actual_pos = np.zeros((len(dfm)))
+    start_index = 0
+    actual_pos[start_index: start_index + len(c)] += c
+
+    dfm["actual_pos"] = actual_pos
+    dfm["total_pos"] = dfm.infected + dfm.removed
+
+    dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
+
