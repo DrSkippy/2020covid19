@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG, filename=logfile)
 url = "https://covidtracking.com/api/{}"
 logging.info("using url={}".format(url))
 
-data_file = "/Users/drskippy/data/{}_{}.csv"
+output_data_file = "/Users/drskippy/data/{}_{}.csv"
 
 
 def get_state_description():
@@ -25,6 +25,7 @@ def get_state_description():
             print("sleeping 5 s...")
             time.sleep(5)
     res_json = res.json()
+    logging.info("fetched from url={}".format(url.format("states")))
     logging.info("state descriptions retrieved={}".format(len(res_json)))
     return res_json
 
@@ -39,6 +40,7 @@ def get_state_daily():
             print("sleeping 5 s...")
             time.sleep(5)
     res_json = res.json()
+    logging.info("fetched from url={}".format(url.format("states/daily")))
     logging.info("daily information retrieved={}".format(len(res_json)))
     return res_json
 
@@ -71,10 +73,10 @@ def get_joined_dataframe(df_daily, df_state):
 
 def save_data(df, s):
     dts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H%M")
-    df.to_csv(data_file.format(dts, "state_daily_data"))
-    wrtr = csv.writer(open(data_file.format(dts, "state_rank"), "w"))
+    df.to_csv(output_data_file.format(dts, "state_daily_data"))
+    wrtr = csv.writer(open(output_data_file.format(dts, "state_rank"), "w"))
     wrtr.writerow(s.tolist())
-    return (data_file.format(dts, "state_daily_data"), data_file.format(dts, "state_rank"))
+    return (output_data_file.format(dts, "state_daily_data"), output_data_file.format(dts, "state_rank"))
 
 
 def get_dataset_df_from_file(fn=(None, None)):

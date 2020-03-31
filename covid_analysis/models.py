@@ -4,6 +4,7 @@ from scipy.integrate import odeint
 from scipy.optimize import minimize
 
 import logging
+import datetime
 
 from covid_analysis.utility import *
 
@@ -82,6 +83,25 @@ def estimate_current_cases(new_by_day, resolution_time=10, hospitalized=.15, icu
     except ValueError as e:
         res = (0,0,0)
     return res
+
+
+def projections(dfus, dt, pos_dr):
+    print("\nUS flu death rate average per week = 61,099/52 ≈ {:,}".format(int(61099/52)))
+    print("Using doubling time of {:2.2f} days".format(dt))
+    print("period      date         positive,     deaths              weekly rate")
+    print("-------------------------------------------------------------------------------------")
+    now, v = dfus[-1:][["date", "positive"]].values[0]
+    start, _ = dfus[1:][["date", "positive"]].values[0]
+    time_in_weeks = (now - start).total_seconds()/(86400*7)
+    pstr = "{:4}: {:%Y-%m-%d %H h}, {:10,d} [total deaths {:6,d}] Death Rate Avg = {:,d} per wk"
+    print(pstr.format(0, now, int(v), int(v*pos_dr), int(v*pos_dr/time_in_weeks)))
+
+    ddt = datetime.timedelta(days=dt)
+    for i in range(1,4):
+        t = now + i*ddt
+        time_in_weeks = (t - start).total_seconds()/(86400*7)
+        v *= 2
+        print(pstr.format(i,t,int(v), int(v*pos_dr), int(v*pos_dr/time_in_weeks)))
 
 
 def SIRModel(N=100, I0=1, R0=0, beta=0.3, gamma=0.1):

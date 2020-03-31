@@ -5,10 +5,19 @@ logfile = "/Users/drskippy/logs/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
 
-def get_state_df(df, state, pos_key = "positive"):
+def get_state_df(df, state, pos_key="positive"):
     if state == "*":
-        # all states int he list, aggregated
-        dfq = df.groupby('date', as_index=False)[["date", pos_key, "negative", "pending"]].sum()
+        key_list = ["date",
+             pos_key,
+             "negative",
+             "pending"]
+        if "totalTestResults" in df.columns:
+            key_list.extend(
+             ["totalTestResults",
+             "death"]
+            )
+        # all states in the list, aggregated
+        dfq = df.groupby('date', as_index=False)[key_list].sum()
         dfq["lastUpdateEt"] =  max(df["lastUpdateEt"])  # use most recent for everything
     else:
         # select data for the state
