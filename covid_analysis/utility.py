@@ -1,5 +1,6 @@
 import logging
-import numpy as np
+
+
 
 logfile = "/Users/drskippy/logs/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
@@ -26,4 +27,6 @@ def get_state_df(df, state, pos_key="positive"):
     last_update_date = dfq["lastUpdateEt"].values[0]
     dfq["daily_new_positive"] = dfq[pos_key].diff(1)
     return dfq, last_update_date
+
+
 

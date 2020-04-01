@@ -30,6 +30,7 @@ def get_dataset_df_from_file(fn="/Users/drskippy/Working/2020covid19/data/total-
     sl = df.state.unique()
     return df, sl
 
+
 if "__main__" == __name__:
     df, sl = get_dataset_df_from_file()
     print(df.describe())

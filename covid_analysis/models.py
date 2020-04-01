@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy.integrate import odeint
 from scipy.optimize import minimize
 
@@ -157,4 +158,46 @@ def SIRFitter(c, N=350000,  x0=(0.3896, 0.08149, 0.1), R0=0):
     dfm["total_pos"] = dfm.infected + dfm.removed
 
     dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
+    return a.x
 
+def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylimit=7):
+    dfq, _ = get_state_df(dfw, code)
+    try:
+        state_name = dfq.Entity.values[0]
+    except AttributeError:
+        if code == "*":
+            state_name = "US"
+        else:
+            state_name = code
+    start_date, end_date = dfq.date.min(), dfq.date.max()
+    delta_t = pd.Timedelta(days=1)
+    days = int((end_date - start_date).days)
+    dtv, dtt = [], []
+    for i in range(days - window_size + 2):
+        sdt = start_date + i * delta_t
+        edt = sdt + window_size * delta_t
+        _df = dfq.loc[(dfq.date >= sdt) & (dfq.date < edt)].copy()
+        dfa, dt, lud = get_state_doubling_df(_df, "*", use_last_n_days=window_size)
+        dtv.append(dt)
+        dtt.append(_df.date.values[-1])
+    plt.figure(figsize=[7, 2])
+    plt.ylim((0, min([100, 1.1 * max(dtv)])))
+    plt.plot(dtt, dtv, "*r-")
+    plt.title("{} Doubling Period ({} day moving window)".format(state_name, window_size))
+    plt.ylabel("Doubling Period")
+    plt.xlabel("Date")
+    plt.show()
+    # by ratio
+    plt.figure(figsize=[7, 2])
+    plt.plot(dtt, np.array(dtv) / resolution_time, "*b-")
+    plt.plot(dtt, np.ones(len(dtt)), "g")
+    plt.fill_between(dtt, np.ones(len(dtt)) * 3, np.ones(len(dtt)) * 5, where=np.ones(len(dtt)), color="yellow",
+                     alpha=0.1)
+    plt.fill_between(dtt, np.ones(len(dtt)) * 5, np.ones(len(dtt)) * ylimit, where=np.ones(len(dtt)), color="yellow",
+                     alpha=0.05)
+    plt.fill_between(dtt, np.zeros(len(dtt)), np.ones(len(dtt)) * 3, where=np.ones(len(dtt)), color="red", alpha=0.1)
+    plt.title("{} Ratio ({} day moving average)".format(state_name, window_size))
+    plt.ylim((0, ylimit))
+    plt.ylabel("Doubling Period/\nRecovery Time")
+    plt.xlabel("Date")
+    plt.show()
