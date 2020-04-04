@@ -105,60 +105,124 @@ def projections(dfus, dt, pos_dr):
         print(pstr.format(i,t,int(v), int(v*pos_dr), int(v*pos_dr/time_in_weeks)))
 
 
-def SIRModel(N=100, I0=1, R0=0, beta=0.3, gamma=0.1):
-    # e.g. 5696 (thousand) for population of CO
-    # print("R-nought={}".format(beta/gamma))
-    # Total population, N.
-    # Initial number of infected and recovered individuals, I0 and R0.
-    # Everyone else, S0, is susceptible to infection initially.
-    S0 = N - I0 - R0
-    # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
-    # A grid of time points (in days)
-    t = np.linspace(0, 160, 160)
-    # The SIR model differential equations.
-    def deriv(y, t, N, beta, gamma):
-        S, I, R = y
-        dSdt = -beta * S * I / N
-        dIdt = beta * S * I / N - gamma * I
-        dRdt = gamma * I
-        return dSdt, dIdt, dRdt
+class SIR:
+    def __init__(self):
+        pass
 
-    # Initial conditions vector
-    y0 = S0, I0, R0
-    # Integrate the SIR equations over the time grid, t.
-    ret = odeint(deriv, y0, t, args=(N, beta, gamma))
-    S, I, R = ret.T
+    def SIRModel(self, N=100, I0=1, R0=0, beta=0.3, gamma=0.1):
+        # e.g. 5696 (thousand) for population of CO
+        # print("R-nought={}".format(beta/gamma))
+        # Total population, N.
+        # Initial number of infected and recovered individuals, I0 and R0.
+        # Everyone else, S0, is susceptible to infection initially.
+        S0 = N - I0 - R0
+        # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
+        # A grid of time points (in days)
+        t = np.linspace(0, 160, 160)
+        # The SIR model differential equations.
+        def deriv(y, t, N, beta, gamma):
+            S, I, R = y
+            dSdt = -beta * S * I / N
+            dIdt = beta * S * I / N - gamma * I
+            dRdt = gamma * I
+            return dSdt, dIdt, dRdt
 
-    df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R})
-    return df
+        # Initial conditions vector
+        y0 = S0, I0, R0
+        # Integrate the SIR equations over the time grid, t.
+        ret = odeint(deriv, y0, t, args=(N, beta, gamma))
+        S, I, R = ret.T
 
-
-def SIRSSE(x, N, R0, c):
-    beta, gamma, I0 = x
-    dfp = SIRModel(N, I0, R0, beta, gamma)
-    cp = dfp.infected.values + dfp.removed.values
-    cp = cp[:len(c)]
-    res = np.linalg.norm(c-cp)**2
-    return res
+        df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R})
+        return df
 
 
-def SIRFitter(c, N=350000,  x0=(0.3896, 0.08149, 0.1), R0=0):
-    a = minimize(SIRSSE, x0, args=(N, R0, c), method="Powell")
-    print(a)
-    beta, gamma, I0 = a.x
+    def SIRSSE(self, x, N, R0, c):
+        beta, gamma, I0 = x
+        dfp = self.SIRModel(N, I0, R0, beta, gamma)
+        cp = dfp.infected.values + dfp.removed.values
+        cp = cp[:len(c)]
+        res = np.linalg.norm(c-cp)**2
+        return res
 
-    dfm = SIRModel(N=N, I0=I0, R0=R0, beta=beta, gamma=gamma)
-    dfm.plot(figsize=[15, 6])
 
-    actual_pos = np.zeros((len(dfm)))
-    start_index = 0
-    actual_pos[start_index: start_index + len(c)] += c
+    def SIRFitter(self, c, N=350000,  x0=(0.3896, 0.08149, 0.1), R0=0):
+        a = minimize(self.SIRSSE, x0, args=(N, R0, c), method="Powell")
+        print(a)
+        beta, gamma, I0 = a.x
 
-    dfm["actual_pos"] = actual_pos
-    dfm["total_pos"] = dfm.infected + dfm.removed
+        dfm = self.SIRModel(N=N, I0=I0, R0=R0, beta=beta, gamma=gamma)
+        dfm.plot(figsize=[15, 6])
 
-    dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
-    return a.x
+        actual_pos = np.zeros((len(dfm)))
+        start_index = 0
+        actual_pos[start_index: start_index + len(c)] += c
+
+        dfm["actual_pos"] = actual_pos
+        dfm["total_pos"] = dfm.infected + dfm.removed
+
+        dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
+        return a.x
+
+class SIR4:
+    def __init__(self):
+        pass
+
+    def SIRModel(self, N=100, I0=1, R0=0, beta0=0.3, alpha=-0.3, gamma=0.1):
+        # e.g. 5696 (thousand) for population of CO
+        # print("R-nought={}".format(beta/gamma))
+        # Total population, N.
+        # Initial number of infected and recovered individuals, I0 and R0.
+        # Everyone else, S0, is susceptible to infection initially.
+        S0 = N - I0 - R0
+        # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
+        # A grid of time points (in days)
+        t = np.linspace(0, 160, 260)
+        # The SIR model differential equations.
+        def deriv(y, t, N, alpha, gamma):
+            S, I, R, beta = y
+            dSdt = -beta * S * I / N
+            dIdt = beta * S * I / N - gamma * I
+            dRdt = gamma * I
+            dbetadt = - np.log(alpha) * alpha ** t
+            return dSdt, dIdt, dRdt, dbetadt
+
+        # Initial conditions vector
+        y0 = S0, I0, R0, beta0
+        # Integrate the SIR equations over the time grid, t.
+        ret = odeint(deriv, y0, t, args=(N, alpha, gamma))
+        S, I, R, beta = ret.T
+
+        df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R, "beta": beta})
+        return df
+
+
+    def SIRSSE(self, x, N, R0, c):
+        alpha, beta0, gamma, I0 = x
+        dfp = self.SIRModel(N, I0, R0, beta0, alpha, gamma)
+        cp = dfp.infected.values + dfp.removed.values
+        cp = cp[:len(c)]
+        res = np.linalg.norm(c-cp)**2
+        return res
+
+
+    def SIRFitter(self, c, N=350000,  x0=(1, 0.33, 0.08, 0.1), R0=0):
+        a = minimize(self.SIRSSE, x0, args=(N, R0, c), method="Powell")
+        print(a)
+        alpha, beta0, gamma, I0 = a.x
+
+        dfm = self.SIRModel(N=N, I0=I0, R0=R0, beta0=beta0, alpha=alpha, gamma=gamma)
+        dfm.plot(figsize=[15, 6])
+
+        actual_pos = np.zeros((len(dfm)))
+        start_index = 0
+        actual_pos[start_index: start_index + len(c)] += c
+
+        dfm["actual_pos"] = actual_pos
+        dfm["total_pos"] = dfm.infected + dfm.removed
+
+        dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
+        return a.x
 
 def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylimit=7):
     dfq, _ = get_state_df(dfw, code)
