@@ -12,27 +12,6 @@ from covid_analysis.utility import *
 logfile = "/Users/drskippy/logs/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
-def _greater_than_and_changes(df, min_pos, pos_key, use_last_n_days=None):
-    df = df.loc[df[pos_key] > min_pos].copy()
-    if use_last_n_days is not None:
-        df = df.iloc[-use_last_n_days:].copy()
-    while df.positive.values[0] == df.positive.values[1]:
-        df = df.iloc[1:].copy()
-    return df
-
-def get_state_doubling_df(df, state, zero_aligned=False, min_pos=10, pos_key="positive", use_last_n_days=None):
-    df_res, last_update = get_state_df(df, state, pos_key)
-    y = df_res[pos_key].values
-    dt, l = doubling_time_in_days(y, use_last_n_days)
-    df_res["exp_fit_line"] = np.exp(l)
-    if zero_aligned:
-        df_res = _greater_than_and_changes(df_res, min_pos, pos_key, use_last_n_days)
-        df_res["log_positive"] = np.log(df_res[pos_key])
-        initial_value = df_res.iloc[0]["log_positive"]
-        df_res["log_positive"] = df_res["log_positive"] - initial_value
-        df_res["days_since_{}".format(min_pos)] = range(len(df_res))
-    return df_res, dt, last_update
-
 
 def _fix_spurious_zeros(x):
     """
@@ -48,7 +27,7 @@ def _fix_spurious_zeros(x):
 
 def doubling_time_in_days(total_by_day, use_last_n_days=None):
     """
-    assumes daily data points, only leading zeros
+    assumes daily data points, only trims zeros
     """
     non_zero_total_by_day = np.trim_zeros(total_by_day)
     non_zero_total_by_day = _fix_spurious_zeros(non_zero_total_by_day)
@@ -57,7 +36,6 @@ def doubling_time_in_days(total_by_day, use_last_n_days=None):
     n_non_zero = len(non_zero_total_by_day)
     # model is linearized logs
     log_total_by_day = np.log(non_zero_total_by_day)
-
     # arbitrary time bases
     t = range(len(total_by_day))
     t_non_zero = t[-n_non_zero:]
@@ -68,41 +46,113 @@ def doubling_time_in_days(total_by_day, use_last_n_days=None):
         fit_line_points = m * np.array(t) + b
     except np.linalg.LinAlgError:
         fit_line_points = np.zeros((len(total_by_day)))
-        m = 1e-10
-    return -np.log(.5)/m, fit_line_points
+        m, b = 1e-10, 0
+    return -np.log(.5)/m, fit_line_points, (m, b)
 
 
-def estimate_current_cases(new_by_day, resolution_time=10, hospitalized=.15, icu=0.04):
-    if len(new_by_day) > resolution_time:
-        s = np.sum(new_by_day[-resolution_time:])
-    elif len(new_by_day) > 0:
-        s = np.sum(new_by_day)
-    else:
-        s = 0
-    try:
-        res = (int(s), int(hospitalized * s), int(icu * s))
-    except ValueError as e:
-        res = (0,0,0)
-    return res
+def get_state_doubling_df(df, state, key="positive", use_last_n_days=None):
+    df_res = get_state_df(df, state)
+    return get_doubling_df(df_res, key, use_last_n_days)
 
 
-def projections(dfus, dt, pos_dr):
-    print("\nUS flu death rate average per week = 61,099/52 ≈ {:,}".format(int(61099/52)))
-    print("Using doubling time of {:2.2f} days".format(dt))
-    print("period      date         positive,     deaths              weekly rate")
-    print("-------------------------------------------------------------------------------------")
-    now, v = dfus[-1:][["date", "positive"]].values[0]
-    start, _ = dfus[1:][["date", "positive"]].values[0]
-    time_in_weeks = (now - start).total_seconds()/(86400*7)
-    pstr = "{:4}: {:%Y-%m-%d %H h}, {:10,d} [total deaths {:6,d}] Death Rate Avg = {:,d} per wk"
-    print(pstr.format(0, now, int(v), int(v*pos_dr), int(v*pos_dr/time_in_weeks)))
+def get_doubling_df(df_res, key="positive", use_last_n_days=None):
+    y = df_res[key].values
+    dt, l, params = doubling_time_in_days(y, use_last_n_days)
+    df_res["exp_fit_line"] = np.exp(l)
+    return df_res, dt, params
 
-    ddt = datetime.timedelta(days=dt)
-    for i in range(1,4):
-        t = now + i*ddt
-        time_in_weeks = (t - start).total_seconds()/(86400*7)
-        v *= 2
-        print(pstr.format(i,t,int(v), int(v*pos_dr), int(v*pos_dr/time_in_weeks)))
+
+def _greater_than_and_changes(df, min_pos, pos_key, use_last_n_days=None):
+    df = df.loc[df[pos_key] > min_pos].copy()
+    if use_last_n_days is not None:
+        df = df.iloc[-use_last_n_days:].copy()
+    while df.positive.values[0] == df.positive.values[1]:
+        df = df.iloc[1:].copy()
+    return df
+
+def get_zero_aligned_log_positive(df, min_pos=10, key="positive", use_last_n_days=None):
+    df_res = _greater_than_and_changes(df, min_pos, key, use_last_n_days)
+    df_res["log_{}".format(key)] = np.log(df_res[key])
+    initial_value = df_res.iloc[0]["log_{}".format(key)]
+    df_res["log_{}".format(key)] = df_res["log_{}".format(key)] - initial_value
+    df_res["days_since_{}".format(min_pos)] = range(len(df_res))
+    return df_res
+
+class CurrentCases:
+    def __init__(self):
+        pass
+
+    def add_positive_estimate(self, df, params=None, suffix="ident", base="positive"):
+        if params is None:
+            params = {"a": 1}
+        key = "positive_{}".format(suffix)
+        df[key] = df[base] * params["a"]
+        return df
+
+    def add_death_estimate(self, df, params=None, suffix="ident", base="death"):
+        if params is None:
+            params = {"a": 1}
+        key = "death_{}".format(suffix)
+        df[key] = df[base] * params["a"]
+        return df
+
+    def add_hostiptalized_estimate(self, df, params=None, suffix="ident", base="new_daily_positive"):
+        if params is None:
+            params = {"a": .15, "rt": 10}
+        key = "hospitalized_{}".format(suffix)
+        df[key] = df[base].rolling(params["rt"]).sum() * params["a"]
+        return df
+
+    def add_icu_estimate(self, df, params=None, suffix="_ident", base="new_daily_positive"):
+        if params is None:
+            params = {"a": .04, "rt": 10}
+        key = "icu_{}".format(suffix)
+        df[key] = df[base].rolling(params["rt"]).sum() * params["a"]
+        return df
+
+
+class CurrentCasesFromDeaths(CurrentCases):
+
+    def add_positive_estimate(self, df, params=None, suffix="fromdeath", base="daily_new_death"):
+        if params is None:
+            params = {"a": 200, "shift": 10}
+        key = "daily_new_positive_{}".format(suffix)
+        df[key] = df[base] * params["a"]
+        key2 = "positive_{}".format(suffix)
+        df[key2] = df[key].cumsum()
+        self.fit_series = df[key2].values.copy()
+        self.shift = params["shift"]
+        df[key2] = df[key2].shift(-params["shift"], fill_value=0)
+        return df
+
+
+class CurrentCasesUndercount(CurrentCases):
+
+    def add_positive_estimate(self, df, params=None, suffix="undercount", base="daily_new_positive"):
+        if params is None:
+            params = {"a": 0.8}
+        key = "daily_new_positive_{}".format(suffix)
+        df[key] = df[base] * (1 + params["a"])
+        key2 = "positive_{}".format(suffix)
+        df[key2] = df[key].cumsum()
+        self.fit_series = df[key2].values
+        self.shift = 0
+        return df
+
+
+class ModelProjection:
+    def __init__(self):
+        self.d_day = pd.Timedelta(days=1)
+
+    def project(self, df, days, params=None):
+        if params is None:
+            params = {"last_n_days": 10}
+        # TODO finish this
+
+        df_res, dt, params = get_doubling_df(df, key="positive", use_last_n_days=params["last_n_days"])
+        dfex = 1
+        df_res = df.append(dfex, ignore_index=True)
+        return df_res
 
 
 class SIR:
@@ -226,7 +276,7 @@ class SIR4:
         return a.x
 
 def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylimit=7):
-    dfq, _ = get_state_df(dfw, code)
+    dfq = get_state_df(dfw, code)
     try:
         state_name = dfq.Entity.values[0]
     except AttributeError:
@@ -242,7 +292,7 @@ def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylim
         sdt = start_date + i * delta_t
         edt = sdt + window_size * delta_t
         _df = dfq.loc[(dfq.date >= sdt) & (dfq.date < edt)].copy()
-        dfa, dt, lud = get_state_doubling_df(_df, "*", use_last_n_days=window_size)
+        dfa, dt, params = get_doubling_df(_df, use_last_n_days=window_size)
         dtv.append(dt)
         dtt.append(_df.date.values[-1])
     plt.figure(figsize=[7, 2])

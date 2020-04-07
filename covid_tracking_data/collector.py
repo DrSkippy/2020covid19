@@ -71,6 +71,21 @@ def get_joined_dataframe(df_daily, df_state):
     return df
 
 
+def get_dataset_df():
+    df_description, state_ordered_list = get_ranked_state_description_df(get_state_description())
+    df_daily = get_state_daily_df(get_state_daily())
+    df = get_joined_dataframe(df_daily, df_description)
+    # required fields: date, state, positive, daily_now_positive, death, daily_new_death, last_update, tests
+    mapper = {
+        "lastUpdateEt": "last_update",
+        "totalTestResults": "tests",
+        "deathIncrease": "daily_new_death",
+        "positiveIncrease": "daily_new_positive"
+    }
+    df = df.rename(columns=mapper)
+    return df, state_ordered_list
+
+
 def save_data(df, s):
     dts = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H%M")
     df.to_csv(output_data_file.format(dts, "state_daily_data"))
@@ -81,7 +96,7 @@ def save_data(df, s):
 
 def get_dataset_df_from_file(fn=(None, None)):
     df = pd.read_csv(fn[0])
-    df["lastUpdateEt"] = pd.to_datetime(df["lastUpdateEt"], format="%Y-%m-%d %H:%M:%S")
+    df["last_update"] = pd.to_datetime(df["last_update"], format="%Y-%m-%d %H:%M:%S")
     df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
     df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
     del(df["Unnamed: 0"])
@@ -90,16 +105,11 @@ def get_dataset_df_from_file(fn=(None, None)):
     return df, sl
 
 
-def get_dataset_df():
-    df_description, state_ordered_list = get_ranked_state_description_df(get_state_description())
-    df_daily = get_state_daily_df(get_state_daily())
-    df = get_joined_dataframe(df_daily, df_description)
-    #print(df.head())
-    print(df.describe())
-    return df, state_ordered_list
-
-
 if "__main__" == __name__:
     df, sl = get_dataset_df()
-    print(save_data(df, sl))
+    a = save_data(df, sl)
+    print(a)
+    print(df.columns)
+    df, sl = get_dataset_df_from_file(fn=a)
+    print(df.head())
 

@@ -1,32 +1,21 @@
 import logging
 
-
-
 logfile = "/Users/drskippy/logs/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
 
-def get_state_df(df, state, pos_key="positive"):
+def _create_aggregate_df(df, aak=None):
+    key_list = ["positive", "daily_new_positive", "death", "daily_new_death", "tests"]
+    if aak is not None:
+        key_list.extend(aak)
+    dfq = df.groupby(['date'], as_index=False)[key_list].sum()
+    return dfq
+
+
+def get_state_df(df, state, additional_aggregation_keys=None):
     if state == "*":
-        key_list = ["date",
-             pos_key,
-             "negative",
-             "pending"]
-        if "totalTestResults" in df.columns:
-            key_list.extend(
-             ["totalTestResults",
-             "death"]
-            )
-        # all states in the list, aggregated
-        dfq = df.groupby('date', as_index=False)[key_list].sum()
-        dfq["lastUpdateEt"] =  max(df["lastUpdateEt"])  # use most recent for everything
+        dfq = _create_aggregate_df(df, additional_aggregation_keys)
     else:
-        # select data for the state
         dfq = df.loc[state == df["state"]].copy()
     # pull off last updated value
-    last_update_date = dfq["lastUpdateEt"].values[0]
-    dfq["daily_new_positive"] = dfq[pos_key].diff(1)
-    return dfq, last_update_date
-
-
-
+    return dfq
