@@ -94,6 +94,7 @@ class CurrentCases:
             params = {"a": 1}
         key = "death_{}".format(suffix)
         df[key] = df[base] * params["a"]
+        df[key] = df[key].apply(lambda x: int(x))
         return df
 
     def add_hostiptalized_estimate(self, df, params=None, suffix="ident", base="new_daily_positive"):
@@ -101,13 +102,17 @@ class CurrentCases:
             params = {"a": .15, "rt": 10}
         key = "hospitalized_{}".format(suffix)
         df[key] = df[base].rolling(params["rt"]).sum() * params["a"]
+        df[key] = df[key].fillna(0)
+        df[key] = df[key].apply(lambda x: int(x))
         return df
 
-    def add_icu_estimate(self, df, params=None, suffix="_ident", base="new_daily_positive"):
+    def add_icu_estimate(self, df, params=None, suffix="ident", base="new_daily_positive"):
         if params is None:
             params = {"a": .04, "rt": 10}
         key = "icu_{}".format(suffix)
         df[key] = df[base].rolling(params["rt"]).sum() * params["a"]
+        df[key] = df[key].fillna(0)
+        df[key] = df[key].apply(lambda x: int(x))
         return df
 
 
@@ -119,7 +124,7 @@ class CurrentCasesFromDeaths(CurrentCases):
         key = "daily_new_positive_{}".format(suffix)
         df[key] = df[base] * params["a"]
         key2 = "positive_{}".format(suffix)
-        df[key2] = df[key].cumsum()
+        df[key2] = df[key].cumsum().apply(lambda x: int(x))
         self.fit_series = df[key2].values.copy()
         self.shift = params["shift"]
         df[key2] = df[key2].shift(-params["shift"], fill_value=0)
@@ -134,24 +139,34 @@ class CurrentCasesUndercount(CurrentCases):
         key = "daily_new_positive_{}".format(suffix)
         df[key] = df[base] * (1 + params["a"])
         key2 = "positive_{}".format(suffix)
-        df[key2] = df[key].cumsum()
+        df[key2] = df[key].cumsum().apply(lambda x: int(x))
         self.fit_series = df[key2].values
         self.shift = 0
         return df
 
 
-class ModelProjection:
+class ModelProjectionExponential:
     def __init__(self):
-        self.d_day = pd.Timedelta(days=1)
+        pass
 
     def project(self, df, days, params=None):
         if params is None:
             params = {"last_n_days": 10}
-        # TODO finish this
-
         df_res, dt, params = get_doubling_df(df, key="positive", use_last_n_days=params["last_n_days"])
-        dfex = 1
-        df_res = df.append(dfex, ignore_index=True)
+        start = df.date.values[0]
+        periods = len(df) + days
+        date = pd.date_range(start=start, periods=periods)
+        t = np.arange(1, periods+1, 1)
+        yp = np.exp(params[1] + params[0]*t)
+        yp = yp.astype("int")
+        y = np.zeros((periods,))
+        y[:len(df)] = y[:len(df)] + df.positive.values
+        df_res = pd.DataFrame.from_dict({"day_number": t, "date": date, "positive_predicted": yp, "positive": y})
+        df_res["new_daily_positive"] = df_res.positive_predicted.diff(1)
+        df_res["new_daily_positive"] = df_res["new_daily_positive"].fillna(0)
+        cc = CurrentCases()
+        df_res = cc.add_hostiptalized_estimate(df_res)
+        df_res = cc.add_icu_estimate(df_res)
         return df_res
 
 
@@ -159,7 +174,7 @@ class SIR:
     def __init__(self):
         pass
 
-    def SIRModel(self, N=100, I0=1, R0=0, beta=0.3, gamma=0.1):
+    def SIRModel(self, N=100, I0=1, R0=0, beta=0.3, gamma=0.1, periods=160):
         # e.g. 5696 (thousand) for population of CO
         # print("R-nought={}".format(beta/gamma))
         # Total population, N.
@@ -168,7 +183,7 @@ class SIR:
         S0 = N - I0 - R0
         # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
         # A grid of time points (in days)
-        t = np.linspace(0, 160, 160)
+        t = np.linspace(0, periods, periods)
         # The SIR model differential equations.
         def deriv(y, t, N, beta, gamma):
             S, I, R = y
@@ -186,7 +201,6 @@ class SIR:
         df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R})
         return df
 
-
     def SIRSSE(self, x, N, R0, c):
         beta, gamma, I0 = x
         dfp = self.SIRModel(N, I0, R0, beta, gamma)
@@ -200,25 +214,27 @@ class SIR:
         a = minimize(self.SIRSSE, x0, args=(N, R0, c), method="Powell")
         print(a)
         beta, gamma, I0 = a.x
+        return (N, I0, R0, beta, gamma)
 
-        dfm = self.SIRModel(N=N, I0=I0, R0=R0, beta=beta, gamma=gamma)
-        dfm.plot(figsize=[15, 6])
-
+    def project(self, c, periods, params=None):
+        # ignore df and generate it here
+        dfm = self.SIRModel(*params["SIR"])
+        dfm["date"] = pd.date_range(start=params["start_date"], periods=periods)
         actual_pos = np.zeros((len(dfm)))
-        start_index = 0
-        actual_pos[start_index: start_index + len(c)] += c
+        actual_pos[:len(c)] += c
+        dfm["positive"] = actual_pos
+        dfm["positive_predicted"] = dfm.infected + dfm.removed
+        dfm["new_daily_positive"] = dfm.positive_predicted.diff(1)
+        dfm["new_daily_positive"] = dfm["new_daily_positive"].fillna(0)
+        cc = CurrentCases()
+        dfm = cc.add_hostiptalized_estimate(dfm)
+        dfm = cc.add_icu_estimate(dfm)
+        return dfm
 
-        dfm["actual_pos"] = actual_pos
-        dfm["total_pos"] = dfm.infected + dfm.removed
 
-        dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
-        return a.x
+class SIR4(SIR):
 
-class SIR4:
-    def __init__(self):
-        pass
-
-    def SIRModel(self, N=100, I0=1, R0=0, beta0=0.3, alpha=-0.3, gamma=0.1):
+    def SIRModel(self, N=100, I0=1, R0=0, beta0=0.3, alpha=-0.3, gamma=0.1, periods=160):
         # e.g. 5696 (thousand) for population of CO
         # print("R-nought={}".format(beta/gamma))
         # Total population, N.
@@ -227,7 +243,7 @@ class SIR4:
         S0 = N - I0 - R0
         # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
         # A grid of time points (in days)
-        t = np.linspace(0, 160, 260)
+        t = np.linspace(0, periods, periods)
         # The SIR model differential equations.
         def deriv(y, t, N, alpha, gamma):
             S, I, R, beta = y
@@ -235,7 +251,6 @@ class SIR4:
             dIdt = beta * S * I / N - gamma * I
             dRdt = gamma * I
             dbetadt = - alpha
-            #dbetadt = - np.log(alpha) * alpha ** t
             return dSdt, dIdt, dRdt, dbetadt
 
         # Initial conditions vector
@@ -247,7 +262,6 @@ class SIR4:
         df = pd.DataFrame(data={"susceptible": S, "infected": I, "removed": R, "beta": beta})
         return df
 
-
     def SIRSSE(self, x, N, R0, c):
         alpha, beta0, gamma, I0 = x
         dfp = self.SIRModel(N, I0, R0, beta0, alpha, gamma)
@@ -256,24 +270,12 @@ class SIR4:
         res = np.linalg.norm(c-cp)**2
         return res
 
-
     def SIRFitter(self, c, N=350000,  x0=(1, 0.33, 0.08, 0.1), R0=0):
         a = minimize(self.SIRSSE, x0, args=(N, R0, c), method="Powell")
         print(a)
         alpha, beta0, gamma, I0 = a.x
+        return (N, I0, R0, beta0, alpha, gamma)
 
-        dfm = self.SIRModel(N=N, I0=I0, R0=R0, beta0=beta0, alpha=alpha, gamma=gamma)
-        dfm.plot(figsize=[15, 6])
-
-        actual_pos = np.zeros((len(dfm)))
-        start_index = 0
-        actual_pos[start_index: start_index + len(c)] += c
-
-        dfm["actual_pos"] = actual_pos
-        dfm["total_pos"] = dfm.infected + dfm.removed
-
-        dfm.plot(y=["actual_pos", "total_pos"], figsize=[15, 6], ylim=[0, 1.2*np.max(c)])
-        return a.x
 
 def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylimit=7):
     dfq = get_state_df(dfw, code)
