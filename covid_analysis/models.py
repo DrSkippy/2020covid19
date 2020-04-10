@@ -303,6 +303,7 @@ def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylim
     plt.title("{} Doubling Period ({} day moving window)".format(state_name, window_size))
     plt.ylabel("Doubling Period")
     plt.xlabel("Date")
+    plt.xticks(rotation = 45)
     plt.show()
     # by ratio
     plt.figure(figsize=[7, 2])
@@ -317,4 +318,5 @@ def period_factor_plot(dfw, code="CHN", window_size=10, resolution_time=10, ylim
     plt.ylim((0, ylimit))
     plt.ylabel("Doubling Period/\nRecovery Time")
     plt.xlabel("Date")
+    plt.xticks(rotation=45)
     plt.show()
