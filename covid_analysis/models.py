@@ -250,7 +250,7 @@ class SIR4(SIR):
             dSdt = -beta * S * I / N
             dIdt = beta * S * I / N - gamma * I
             dRdt = gamma * I
-            dbetadt = - alpha
+            dbetadt = - alpha * I
             return dSdt, dIdt, dRdt, dbetadt
 
         # Initial conditions vector
