@@ -15,6 +15,18 @@ logging.info("using url={}".format(url))
 output_data_file = "/Users/drskippy/data/{}_{}.csv"
 
 
+def get_state_populations():
+    dfsp = pd.read_csv("data/nst-est2019-01.csv", thousands=',')
+    dfsp = dfsp[["state", "population"]].copy()
+    return dfsp
+
+
+def add_population_column(df):
+    dfsp = get_state_populations()
+    dfr = pd.merge(df, dfsp, on='state', how='left')
+    return dfr
+
+
 def get_state_description():
     success = False
     while not success:
