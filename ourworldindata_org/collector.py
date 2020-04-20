@@ -29,13 +29,14 @@ def get_dataset_df_from_files(fnc=in_filename_cases, fnd=in_filename_deaths):
     mapper = {
         "Code": "state",
         "Total confirmed cases of COVID-19 (cases)": "positive",
-        "Total confirmed deaths (deaths)": "death",
-        "Daily new confirmed deaths (deaths)": "daily_new_death"
-    }
+        "Total confirmed deaths due to COVID-19 (deaths)": "death"
+             }
+
     df = df.rename(columns=mapper)
     df["date"] = pd.to_datetime(df.Date.apply(lambda x: x.strip().lower()), format="%b %d, %Y")
     df["last_update"] = datetime.datetime.utcnow()
     df["daily_new_positive"] = df.positive.diff(1)
+    df["daily_new_death"] = df.death.diff(1)
     sl = df.state.unique()
     return df, sl
 
