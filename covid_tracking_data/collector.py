@@ -78,7 +78,8 @@ def get_state_daily_df(state_daily_json):
 
 
 def get_joined_dataframe(df_daily, df_state):
-    df = df_daily.join(df_state[["order", "lastUpdateEt"]], on="state", how="outer")
+    logging.info("df_daily={} df_state={}".format(df_daily.columns, df_state.columns))
+    df = df_daily.join(df_state[["order", "lastUpdateEt"]], on="state", how="outer", rsuffix="_state")
     df = df.sort_values(by=["order", "date"], ignore_index=True)
     return df
 
@@ -108,7 +109,8 @@ def save_data(df, s):
 
 def get_dataset_df_from_file(fn=(None, None)):
     df = pd.read_csv(fn[0])
-    df["last_update"] = pd.to_datetime(df["last_update"], format="%Y-%m-%d %H:%M:%S")
+    #df["last_update"] = pd.to_datetime(df["last_update"], format="%Y-%m-%d %H:%M:%S")
+    df["last_update"] = pd.to_datetime(df["last_update"], format="%m/%d/%Y %H:%M")
     df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
     df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
     del(df["Unnamed: 0"])
