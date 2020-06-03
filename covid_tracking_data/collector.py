@@ -59,10 +59,12 @@ def get_state_daily():
 
 def get_ranked_state_description_df(state_description_json):
     dfs = pd.DataFrame.from_dict(state_description_json)
-    dfs["lastUpdateEt"] = dfs["lastUpdateEt"].apply(lambda x: "2020/{}".format(x))
-    dfs["checkTimeEt"] = dfs["checkTimeEt"].apply(lambda x: "2020/{}".format(x))
-    dfs["lastUpdateEt"] = pd.to_datetime(dfs["lastUpdateEt"], format="%Y/%m/%d %H:%M")
-    dfs["checkTimeEt"] = pd.to_datetime(dfs["checkTimeEt"], format="%Y/%m/%d %H:%M")
+    #dfs["lastUpdateEt"] = dfs["lastUpdateEt"].apply(lambda x: "2020/{}".format(x))
+    #dfs["checkTimeEt"] = dfs["checkTimeEt"].apply(lambda x: "2020/{}".format(x))
+    #dfs["lastUpdateEt"] = pd.to_datetime(dfs["lastUpdateEt"], format="%Y/%m/%d %H:%M")
+    #dfs["lastUpdateEt"] = pd.to_datetime(dfs["lastUpdateEt"], format="%m/%d/%Y %H:%M")
+    #dfs["checkTimeEt"] = pd.to_datetime(dfs["checkTimeEt"], format="%Y/%m/%d %H:%M")
+    #dfs["checkTimeEt"] = pd.to_datetime(dfs["checkTimeEt"], format="%m/%d/%Y %H:%M")
     dfs = dfs.sort_values(by=["positive"], ignore_index=True, ascending=False)
     dfs.reset_index(inplace=True)
     states_in_order = dfs.state.unique()
