@@ -1,6 +1,6 @@
 import logging
 
-logfile = "/Users/drskippy/logs/covid.log"
+logfile = "/home/scott/log/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
 

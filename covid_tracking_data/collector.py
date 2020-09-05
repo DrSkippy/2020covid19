@@ -6,13 +6,13 @@ import time
 import datetime
 import csv
 
-logfile = "/Users/drskippy/logs/covid.log"
+logfile = "/home/scott/log/covid.log"
 logging.basicConfig(level=logging.DEBUG, filename=logfile)
 
 url = "https://covidtracking.com/api/{}"
 logging.info("using url={}".format(url))
 
-output_data_file = "/Users/drskippy/data/{}_{}.csv"
+output_data_file = "/home/scott/data/{}_{}.csv"
 
 
 def get_state_populations():
@@ -92,7 +92,7 @@ def get_dataset_df():
     df = get_joined_dataframe(df_daily, df_description)
     # required fields: date, state, positive, daily_now_positive, death, daily_new_death, last_update, tests
     mapper = {
-        "lastUpdateEt": "last_update",
+        "lastUpdateEt_state": "last_update",
         "totalTestResults": "tests",
         "deathIncrease": "daily_new_death",
         "positiveIncrease": "daily_new_positive"
@@ -110,13 +110,18 @@ def save_data(df, s):
 
 
 def get_dataset_df_from_file(fn=(None, None)):
-    df = pd.read_csv(fn[0])
-    #df["last_update"] = pd.to_datetime(df["last_update"], format="%Y-%m-%d %H:%M:%S")
+    if "rank" in fn[0]:
+        rank_fn_index = 0
+        daily_fn_index = 1
+    else:
+        rank_fn_index = 1
+        daily_fn_index = 0
+    df = pd.read_csv(fn[daily_fn_index])
     df["last_update"] = pd.to_datetime(df["last_update"], format="%m/%d/%Y %H:%M")
     df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
     df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
     del(df["Unnamed: 0"])
-    rdr = csv.reader(open(fn[1], "r"))
+    rdr = csv.reader(open(fn[rank_fn_index], "r"))
     sl = [r for r in rdr][0]
     return df, sl
 
@@ -128,4 +133,3 @@ if "__main__" == __name__:
     print(df.columns)
     df, sl = get_dataset_df_from_file(fn=a)
     print(df.head())
-
