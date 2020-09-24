@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import requests
 import logging
 import time
@@ -14,6 +13,12 @@ logging.info("using url={}".format(url))
 
 output_data_file = "/home/scott/data/{}_{}.csv"
 
+FMTS = [
+    "%m/%d/%Y %H:%M",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%m/%d %H:%M"
+]
 
 def get_state_populations():
     dfsp = pd.read_csv("data/nst-est2019-01.csv", thousands=',')
@@ -106,7 +111,7 @@ def save_data(df, s):
     df.to_csv(output_data_file.format(dts, "state_daily_data"))
     wrtr = csv.writer(open(output_data_file.format(dts, "state_rank"), "w"))
     wrtr.writerow(s.tolist())
-    return (output_data_file.format(dts, "state_daily_data"), output_data_file.format(dts, "state_rank"))
+    return output_data_file.format(dts, "state_daily_data"), output_data_file.format(dts, "state_rank")
 
 
 def get_dataset_df_from_file(fn=(None, None)):
@@ -117,9 +122,15 @@ def get_dataset_df_from_file(fn=(None, None)):
         rank_fn_index = 1
         daily_fn_index = 0
     df = pd.read_csv(fn[daily_fn_index])
-    df["last_update"] = pd.to_datetime(df["last_update"], format="%m/%d/%Y %H:%M")
-    df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
-    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
+    try:
+        df["last_update"] = pd.to_datetime(df["last_update"], format="%m/%d/%Y %H:%M")
+        #df["last_update"] = pd.to_datetime(df["last_update"], format="%Y-%m-%d %H:%M")
+        #df["dateChecked"] = pd.to_datetime(df["dateChecked"], format="%Y-%m-%d %H:%M:%S")
+        #df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d %H:%M:%S")
+        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
+    except ValueError as e:
+        print("Date parsing error ({})".format(e))
+        print(df.head())
     del(df["Unnamed: 0"])
     rdr = csv.reader(open(fn[rank_fn_index], "r"))
     sl = [r for r in rdr][0]
